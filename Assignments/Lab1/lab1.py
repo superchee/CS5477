@@ -164,10 +164,60 @@ def compute_homography(src, dst):
     h_matrix = np.eye(3, dtype=np.float64)
 
     """ YOUR CODE STARTS HERE """
+    #number of points
+    N = src.shape[0]
+
+
+    #Normalization
+    m_src = src.mean(0)
+    md_src = ((((src - m_src)**2).sum(1))**(1/2)).mean() #mean distance of all points from centroid
+    s_src = sqrt(2)/md_src
+    m_dst = dst.mean(0)
+    md_dst = ((((dst - m_dst)**2).sum(1))**(1/2)).mean()
+    s_dst = sqrt(2)/md_dst
+
+    S_tr_src = np.array([[s_src,0,-s_src*m_src[0]],[0,s_src,-s_src*m_src[1]],[0,0,1]])
+    S_tr_dst = np.array([[s_dst,0,-s_dst*m_dst[0]],[0,s_dst,-s_dst*m_dst[1]],[0,0,1]])
+
+    norm_src = np.dot(S_tr_src, np.concatenate((src.T, np.ones((1,N))))).T
+    norm_dst = np.dot(S_tr_dst, np.concatenate((dst.T, np.ones((1,N))))).T
+
+
+    
+
+
+    #A matrix
+    A = []
+    for i in range(N):
+        x,y = norm_src[i,0], norm_src[i,1]
+        u,v = norm_dst[i,0], norm_dst[i,1]
+        A.append([0,0,0,x,y,1,-v*x,-v*y,-v]) #w_i is chose as 1
+        A.append([x,y,1,0,0,0,-u*x,-u*y,-u])#only two rows are used
+    
+    A = np.asarray(A)
+
+
+    #SVD of A
+    
+    U, S, V = np.linalg.svd(A)
+
+
+    #take the last column of V.T
+    h = V[-1,:]
+    H = h.reshape(3,3)
+
+    #Denormalization:
+    H = np.dot(np.dot(np.linalg.pinv(S_tr_dst),H), S_tr_src)
+    h_matrix = H/H[-1,-1] 
+    
+    
     
     """ YOUR CODE ENDS HERE """
 
     return h_matrix
+
+
+
 
 
 # Part 2
@@ -192,6 +242,33 @@ def warp_image(src, dst, h_matrix):
     dst = dst.copy()  # deep copy to avoid overwriting the original image
 
     """ YOUR CODE STARTS HERE """
+    #get size
+    h, w = dst.shape[0:2]
+
+    #get points
+    x,y = np.meshgrid(range(w), range(h))
+    dst_points = np.array([x.ravel(), y.ravel()]).T
+
+    #transformation
+    m_xy = transform_homography(dst_points, np.linalg.inv(h_matrix))
+
+    #remap
+    map_x = m_xy[:,0].reshape(h,w).astype(np.float32)
+    map_y = m_xy[:,1].reshape(h,w).astype(np.float32)
+    dst_mp = cv2.remap(src, map_x, map_y, interpolation = cv2.INTER_LINEAR, borderMode = cv2.BORDER_TRANSPARENT, borderValue = 0)
+
+    #merge images
+    result_grey = cv2.cvtColor(dst_mp, cv2.COLOR_BGR2GRAY)
+    ret, mask = cv2.threshold(result_grey, 10, 255, cv2.THRESH_BINARY)
+    mask_inv = cv2.bitwise_not(mask)
+    roi = cv2.bitwise_and(dst_mp, dst_mp, mask=mask)
+    im2 = cv2.bitwise_and(dst, dst, mask=mask_inv)
+    dst = cv2.add(im2, roi)
+
+
+
+
+
     
     """ YOUR CODE ENDS HERE """
 
