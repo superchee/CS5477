@@ -179,10 +179,11 @@ def compute_homography(src, dst):
     S_tr_src = np.array([[s_src,0,-s_src*m_src[0]],[0,s_src,-s_src*m_src[1]],[0,0,1]])
     S_tr_dst = np.array([[s_dst,0,-s_dst*m_dst[0]],[0,s_dst,-s_dst*m_dst[1]],[0,0,1]])
 
-    norm_src = np.dot(S_tr_src, np.concatenate((src.T, np.ones((1,N))))).T
-    norm_dst = np.dot(S_tr_dst, np.concatenate((dst.T, np.ones((1,N))))).T
+    src_tr_points = np.dot(S_tr_src, np.concatenate((src.T, np.ones((1,N)))))
+    dst_tr_points = np.dot(S_tr_dst, np.concatenate((dst.T, np.ones((1,N)))))
 
-
+    norm_src = src_tr_points.T
+    norm_dst = dst_tr_points.T
     
 
 
@@ -257,7 +258,7 @@ def warp_image(src, dst, h_matrix):
     map_y = m_xy[:,1].reshape(h,w).astype(np.float32)
     dst_mp = cv2.remap(src, map_x, map_y, interpolation = cv2.INTER_LINEAR, borderMode = cv2.BORDER_TRANSPARENT, borderValue = 0)
 
-    #merge images
+    #merge the two images
     result_grey = cv2.cvtColor(dst_mp, cv2.COLOR_BGR2GRAY)
     ret, mask = cv2.threshold(result_grey, 10, 255, cv2.THRESH_BINARY)
     mask_inv = cv2.bitwise_not(mask)
@@ -347,6 +348,10 @@ def compute_homography_error(src, dst, homography):
     d = np.zeros(src.shape[0], np.float64)
 
     """ YOUR CODE STARTS HERE """
+
+    d = ((src - transform_homography(dst, np.linalg.inv(homography)))**2).sum(1) + \
+        ((dst - transform_homography(src, homography))**2).sum(1)
+
     
     """ YOUR CODE ENDS HERE """
 
@@ -382,7 +387,30 @@ def compute_homography_ransac(src, dst, thresh=16.0, num_tries=200):
     mask = np.ones(src.shape[0], dtype=np.bool)
 
     """ YOUR CODE STARTS HERE """
+
+    maxMask = np.zeros(src.shape[0], dtype=np.bool)
+    for i in range(num_tries):
+        A = []
+        B = []
+        for j in range(4):
+            idx = np.random.randint(src.shape[0])
+            A.append(src[idx])
+            B.append(dst[idx])
+
+        A = np.asarray(A)
+        B = np.asarray(B)
+
+        h = compute_homography(A,B)
+        d = compute_homography_error(src,dst,h)
+
+        mask = d < 16
+        if mask.sum() > maxMask.sum():
+            maxMask = mask
     
+    mask = maxMask
+    src_inliners = src[mask,:]
+    dst_inliners = dst[mask,:]
+    h_matrix = compute_homography(src_inliners,dst_inliners)
     """ YOUR CODE ENDS HERE """
 
     return h_matrix, mask
@@ -409,6 +437,25 @@ def concatenate_homographies(pairwise_h_matrices, ref):
     assert ref < num_images
 
     """ YOUR CODE STARTS HERE """
+    for i in range(num_images):
+        if i == ref:#ref is the identity transformation
+            abs_h_matrices.append(np.eye(3,dtype=np.float64))
+        if i < ref:#left image direct H transformation
+            h_temp = pairwise_h_matrices[i]
+            j = i+1
+            while j < ref:
+                h_temp = h_temp @ pairwise_h_matrices[j]
+                j = j+1
+            abs_h_matrices.append(h_temp)
+        if i > ref:#right image inverse H transformation
+            h_temp = np.linalg.inv(pairwise_h_matrices[i-1])
+            j = i - 1
+            while j > ref:
+                h_temp = h_temp @ np.linalg.inv(pairwise_h_matrices[j-1])
+                j = j - 1
+            abs_h_matrices.append(h_temp)
+        
+
     
     """ YOUR CODE ENDS HERE """
 
