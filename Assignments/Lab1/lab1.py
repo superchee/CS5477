@@ -254,13 +254,7 @@ def warp_image(src, dst, h_matrix):
     #remap
     map_x = m_xy[:,0].reshape(h,w).astype(np.float32)
     map_y = m_xy[:,1].reshape(h,w).astype(np.float32)
-<<<<<<< HEAD
-    dst_3 = cv2.remap(src, map_x, map_y, interpolation = cv2.INTER_LINEAR, borderMode = cv2.BORDER_TRANSPARENT)
-
-    #merge the two images
-    
-=======
-    dst_mp = cv2.remap(src, map_x, map_y, interpolation = cv2.INTER_LINEAR, borderMode = cv2.BORDER_TRANSPARENT, borderValue = 0)
+    dst_mp = cv2.remap(src, map_x, map_y, interpolation = cv2.INTER_LINEAR, borderMode = cv2.BORDER_CONSTANT)
 
     #merge the two images
     result_grey = cv2.cvtColor(dst_mp, cv2.COLOR_BGR2GRAY)
@@ -272,13 +266,12 @@ def warp_image(src, dst, h_matrix):
 
 
 
->>>>>>> 4f79347da93e9e049f7f5e6c4b91471108c2707e
 
 
     
     """ YOUR CODE ENDS HERE """
 
-    return dst_3
+    return dst
 
 
 def warp_images_all(images, h_matrices):
@@ -397,17 +390,10 @@ def compute_homography_ransac(src, dst, thresh=16.0, num_tries=200):
     for i in range(num_tries):
         A = []
         B = []
-<<<<<<< HEAD
         four_idx = random.sample(range(src.shape[0]),4)
         for j in range(4):
             A.append(src[four_idx[j]])
             B.append(dst[four_idx[j]])
-=======
-        for j in range(4):
-            idx = np.random.randint(src.shape[0])
-            A.append(src[idx])
-            B.append(dst[idx])
->>>>>>> 4f79347da93e9e049f7f5e6c4b91471108c2707e
 
         A = np.asarray(A)
         B = np.asarray(B)
