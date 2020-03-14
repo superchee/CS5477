@@ -1,9 +1,15 @@
 """ CS4277/CS5477 Lab 2: Camera Calibration.
 See accompanying Jupyter notebook (lab2.ipynb) for instructions.
 
+<<<<<<< HEAD
 Name: CAOQI
 Email: e0338189@u.nus.edu
 NUSNET ID: e0338189
+=======
+Name: <Your Name here>
+Email: <username>@u.nus.edu
+NUSNET ID: e1234567
+>>>>>>> 4f79347da93e9e049f7f5e6c4b91471108c2707e
 """
 
 
@@ -118,6 +124,7 @@ def init_param(pts_model, pts_2d):
     R_all = []
     T_all = []
     K = None
+<<<<<<< HEAD
     V_list = []
     H1 = []
     H2 = []
@@ -182,6 +189,18 @@ def init_param(pts_model, pts_2d):
         """ YOUR CODE ENDS HERE """
     #R_all.append(rvecs)
     #T_all.append(tvecs)
+=======
+    # for i in range(len(pts_2d)):
+    #     pts_src = pts_model.T
+    #     pts_dst = pts_2d[i].T
+
+    """ YOUR CODE STARTS HERE """
+    ret, K, dist, rvecs, tvecs = cv2.calibrateCamera(pts_src, pts_dst, (640, 480), None, None)
+    R_all.append(rvecs)
+    T_all.append(tvecs)
+    """ YOUR CODE ENDS HERE """
+
+>>>>>>> 4f79347da93e9e049f7f5e6c4b91471108c2707e
     return R_all, T_all, K
 
 
@@ -219,6 +238,7 @@ def error_fun(param, pts_model, pts_2d):
     points_ud_all = np.concatenate(points_ud_all, axis=1)
 
     """ YOUR CODE STARTS HERE """
+<<<<<<< HEAD
     #points_d = np.zeros_like(points_ud_all)  # replace this line with the real distorted points points_d, where points_d = x_r + dx
     points_d = []
     for j in range(points_ud_all.shape[1]):
@@ -234,6 +254,9 @@ def error_fun(param, pts_model, pts_2d):
     points_d = np.dot(A, np.concatenate([points_d, np.ones([1, points_d.shape[1]])], axis=0))
     points_d = points_d[0:2] / points_d[2:3]
 
+=======
+    points_d = np.zeros_like(points_ud_all)  # replace this line with the real distorted points points_d, where points_d = x_r + dx
+>>>>>>> 4f79347da93e9e049f7f5e6c4b91471108c2707e
     """ YOUR CODE ENDS HERE """
 
     error = np.sum(np.square(points_2d - points_d), axis= 0)
@@ -258,6 +281,10 @@ def visualize_distorted(param, pts_model, pts_2d):
         The visualized results
 
     """
+<<<<<<< HEAD
+=======
+
+>>>>>>> 4f79347da93e9e049f7f5e6c4b91471108c2707e
     K = param[0:5]
     A = np.array([K[0], K[1], K[2], 0, K[3], K[4], 0, 0, 1]).reshape([3, 3])
     k = param[5:10]
@@ -272,6 +299,7 @@ def visualize_distorted(param, pts_model, pts_2d):
         points_ud = points_ud[0:2, :] / points_ud[2:3]
 
         """ YOUR CODE STARTS HERE """
+<<<<<<< HEAD
         #points_d = np.zeros_like(points_ud)  # replace this line with the real distorted points points_d, where points_d = x_r + dx
         points_d = []
         for j in range(points_ud.shape[1]):
@@ -283,6 +311,9 @@ def visualize_distorted(param, pts_model, pts_2d):
             x_d = x_r + d_x
             points_d.append(x_d)
         points_d = np.array(points_d).T
+=======
+        points_d = np.zeros_like(points_ud)  # replace this line with the real distorted points points_d, where points_d = x_r + dx
+>>>>>>> 4f79347da93e9e049f7f5e6c4b91471108c2707e
         """ YOUR CODE ENDS HERE """
 
 
