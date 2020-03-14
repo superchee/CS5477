@@ -1,18 +1,16 @@
 """ CS4277/CS5477 Lab 1: Fun with Homographies.
 See accompanying Jupyter notebook (lab1.ipynb) for instructions.
 
-Name: <Your Name here>
-Email: <username>@u.nus.edu
-Student ID: A0123456X
+Name: CAO QI
+Email: e0338189@u.nus.edu
+Student ID: A0191545B
 
-Name2: <Name of second member, if any>
-Email2: <username>@u.nus.edu
-Student ID: A0123456X
 """
 from math import floor, ceil, sqrt
 
 import cv2
 import numpy as np
+import random
 
 _COLOR_RED = (255, 0, 0)
 _COLOR_GREEN = (0, 255, 0)
@@ -164,10 +162,61 @@ def compute_homography(src, dst):
     h_matrix = np.eye(3, dtype=np.float64)
 
     """ YOUR CODE STARTS HERE """
+    #number of points
+    N = src.shape[0]
+
+
+    #Normalization
+    m_src = src.mean(0)
+    md_src = ((((src - m_src)**2).sum(1))**(1/2)).mean() #mean distance of all points from centroid
+    s_src = sqrt(2)/md_src
+    m_dst = dst.mean(0)
+    md_dst = ((((dst - m_dst)**2).sum(1))**(1/2)).mean()
+    s_dst = sqrt(2)/md_dst
+
+    S_tr_src = np.array([[s_src,0,-s_src*m_src[0]],[0,s_src,-s_src*m_src[1]],[0,0,1]])
+    S_tr_dst = np.array([[s_dst,0,-s_dst*m_dst[0]],[0,s_dst,-s_dst*m_dst[1]],[0,0,1]])
+
+    src_tr_points = np.dot(S_tr_src, np.concatenate((src.T, np.ones((1,N)))))
+    dst_tr_points = np.dot(S_tr_dst, np.concatenate((dst.T, np.ones((1,N)))))
+
+    norm_src = src_tr_points.T
+    norm_dst = dst_tr_points.T
+    
+
+
+    #A matrix
+    A = []
+    for i in range(N):
+        x,y = norm_src[i,0], norm_src[i,1]
+        u,v = norm_dst[i,0], norm_dst[i,1]
+        A.append([0,0,0,x,y,1,-v*x,-v*y,-v]) #w_i is chose as 1
+        A.append([x,y,1,0,0,0,-u*x,-u*y,-u])#only two rows are used
+    
+    A = np.asarray(A)
+
+
+    #SVD of A
+    
+    U, S, V = np.linalg.svd(A)
+
+
+    #take the last column of V.T
+    h = V[-1,:]
+    H = h.reshape(3,3)
+
+    #Denormalization:
+    H = np.dot(np.dot(np.linalg.pinv(S_tr_dst),H), S_tr_src)
+    h_matrix = H/H[-1,-1] 
+    
+    
     
     """ YOUR CODE ENDS HERE """
 
     return h_matrix
+
+
+
 
 
 # Part 2
@@ -192,10 +241,29 @@ def warp_image(src, dst, h_matrix):
     dst = dst.copy()  # deep copy to avoid overwriting the original image
 
     """ YOUR CODE STARTS HERE """
+    #get size
+    h, w = dst.shape[0:2]
+
+    #get points
+    x,y = np.meshgrid(range(w), range(h))
+    dst_points = np.array([x.ravel(), y.ravel()]).T
+
+    #transformation
+    m_xy = transform_homography(dst_points, np.linalg.inv(h_matrix))
+
+    #remap
+    map_x = m_xy[:,0].reshape(h,w).astype(np.float32)
+    map_y = m_xy[:,1].reshape(h,w).astype(np.float32)
+    dst_3 = cv2.remap(src, map_x, map_y, interpolation = cv2.INTER_LINEAR, borderMode = cv2.BORDER_TRANSPARENT)
+
+    #merge the two images
+    
+
+
     
     """ YOUR CODE ENDS HERE """
 
-    return dst
+    return dst_3
 
 
 def warp_images_all(images, h_matrices):
@@ -270,6 +338,10 @@ def compute_homography_error(src, dst, homography):
     d = np.zeros(src.shape[0], np.float64)
 
     """ YOUR CODE STARTS HERE """
+
+    d = ((src - transform_homography(dst, np.linalg.inv(homography)))**2).sum(1) + \
+        ((dst - transform_homography(src, homography))**2).sum(1)
+
     
     """ YOUR CODE ENDS HERE """
 
@@ -305,7 +377,30 @@ def compute_homography_ransac(src, dst, thresh=16.0, num_tries=200):
     mask = np.ones(src.shape[0], dtype=np.bool)
 
     """ YOUR CODE STARTS HERE """
+
+    maxMask = np.zeros(src.shape[0], dtype=np.bool)
+    for i in range(num_tries):
+        A = []
+        B = []
+        four_idx = random.sample(range(src.shape[0]),4)
+        for j in range(4):
+            A.append(src[four_idx[j]])
+            B.append(dst[four_idx[j]])
+
+        A = np.asarray(A)
+        B = np.asarray(B)
+
+        h = compute_homography(A,B)
+        d = compute_homography_error(src,dst,h)
+
+        mask = d < 16
+        if mask.sum() > maxMask.sum():
+            maxMask = mask
     
+    mask = maxMask
+    src_inliners = src[mask,:]
+    dst_inliners = dst[mask,:]
+    h_matrix = compute_homography(src_inliners,dst_inliners)
     """ YOUR CODE ENDS HERE """
 
     return h_matrix, mask
@@ -332,6 +427,25 @@ def concatenate_homographies(pairwise_h_matrices, ref):
     assert ref < num_images
 
     """ YOUR CODE STARTS HERE """
+    for i in range(num_images):
+        if i == ref:#ref is the identity transformation
+            abs_h_matrices.append(np.eye(3,dtype=np.float64))
+        if i < ref:#left image direct H transformation
+            h_temp = pairwise_h_matrices[i]
+            j = i+1
+            while j < ref:
+                h_temp = h_temp @ pairwise_h_matrices[j]
+                j = j+1
+            abs_h_matrices.append(h_temp)
+        if i > ref:#right image inverse H transformation
+            h_temp = np.linalg.inv(pairwise_h_matrices[i-1])
+            j = i - 1
+            while j > ref:
+                h_temp = h_temp @ np.linalg.inv(pairwise_h_matrices[j-1])
+                j = j - 1
+            abs_h_matrices.append(h_temp)
+        
+
     
     """ YOUR CODE ENDS HERE """
 
